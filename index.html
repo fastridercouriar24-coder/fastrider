@@ -458,6 +458,9 @@
     var currentActiveFilter = "all";
     var globalOrdersCache = [];
     var globalPaymentsCache = [];
+    
+    // আপনার গুগল ওয়েব অ্যাপের আসল লিংকটি এখানে দেওয়া আছে
+    var webAppUrl = "https://script.google.com/macros/s/AKfycbyF3ExEMpbpeL7LEPTrDtBFklh4nBaQiULsYLJJ7VINyLqluNCw_x734k4jL6lQNBRC/exec";
 
     // বর্তমান সময় এবং তারিখ নেওয়ার ফাংশন
     function getCurrentDateTime() {
@@ -483,7 +486,7 @@
         // Hide sidebar on mobile after clicking a tab
         document.getElementById('sidebar').classList.remove('show');
         
-        if(tabName === 'list') { handleLiveTracking(); }
+        if(tabName === 'list') { filterOrders(currentActiveFilter); }
     }
 
     // হোম ভিউ রিসেট
@@ -536,7 +539,42 @@
         document.getElementById(labelId).innerText = "৳ " + charge;
     }
 
-    // মার্চেন্ট রেজিস্ট্রেশন (Date & Time সহ)
+    // মার্চেন্ট লগইন (FETCH মোড - ফিক্সড)
+    function handleLogin() {
+        var phoneOrEmail = document.getElementById('login-phone').value;
+        var pass = document.getElementById('login-pass').value;
+        if(!phoneOrEmail || !pass) { alert("লগইন তথ্য দিন!"); return; }
+        
+        fetch(webAppUrl + "?action=login&user=" + encodeURIComponent(phoneOrEmail) + "&pass=" + encodeURIComponent(pass))
+        .then(response => response.json())
+        .then(res => {
+            if(res.status === "blocked") alert("❌ অ্যাকাউন্ট ব্লকড!");
+            else if(res.status === "unverified") alert("⏳ অ্যাকাউন্ট এখনো ভেরিফাইড করা হয়নি।");
+            else if(res.status === "success") {
+                currentUserPhone = res.phone;
+                document.getElementById('auth-section').classList.add('hidden-section');
+                document.getElementById('dashboard-section').classList.remove('hidden-section');
+                document.getElementById('merchant-name-display').innerText = res.orgName;
+                document.getElementById('welcome-name').innerText = res.name;
+                document.getElementById('profile-org').value = res.orgName;
+                document.getElementById('profile-name').value = res.name;
+                document.getElementById('profile-email').value = res.email;
+                document.getElementById('profile-phone').value = res.phone;
+                document.getElementById('profile-pickup').value = res.pickup;
+                startSessionTimeout();
+                
+                // লগইন এর পর ড্যাশবোর্ড ডাটা রিয়েলটাইম লোড করবে
+                loadMerchantDashboardData();
+                alert("🎉 লগইন সফল হয়েছে!");
+            } else alert("❌ ভুল লগইন তথ্য!");
+        })
+        .catch(err => {
+            console.error(err);
+            alert("❌ সার্ভারে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।");
+        });
+    }
+
+    // মার্চেন্ট রেজিস্ট্রেশন (FETCH মোড - ফিক্সড)
     function handleRegister() {
         var org = document.getElementById('reg-org').value;
         var name = document.getElementById('reg-name').value;
@@ -545,108 +583,54 @@
         var phone2 = document.getElementById('reg-phone2').value;
         var pickup = document.getElementById('reg-pickup').value;
         var pass = document.getElementById('reg-pass').value;
-        var timestamp = getCurrentDateTime(); // সময় ও তারিখ
+        var timestamp = getCurrentDateTime();
         
         if(!org || !name || !email || !phone1 || !pickup || !pass) { alert("সব তথ্য সঠিকভাবে দিন!"); return; }
         
-        google.script.run.withSuccessHandler(function(res){
-            if(res === "email_exists") alert("❌ এই ইমেইল ইতিমধ্যে ব্যবহৃত!");
-            else if(res === "phone_exists") alert("❌ এই ফোন নাম্বার ইতিমধ্যে ব্যবহৃত!");
-            else { alert("🎉 রেজিস্ট্রেশন সফল! অ্যাডমিন ভেরিফাই করলে লগইন করতে পারবেন।"); toggleAuth('login'); }
-        }).registerUser(org, name, email, phone1, phone2, pickup, pass, timestamp); // timestamp পাঠানো হলো
+        var params = `?action=register&org=${encodeURIComponent(org)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone1=${encodeURIComponent(phone1)}&phone2=${encodeURIComponent(phone2)}&pickup=${encodeURIComponent(pickup)}&pass=${encodeURIComponent(pass)}&timestamp=${encodeURIComponent(timestamp)}`;
+        
+        fetch(webAppUrl + params)
+        .then(response => response.json())
+        .then(res => {
+            if(res.status === "email_exists") alert("❌ এই ইমেইল ইতিমধ্যে ব্যবহৃত!");
+            else if(res.status === "phone_exists") alert("❌ এই ফোন নম্বর ইতিমধ্যে ব্যবহৃত!");
+            else if(res.status === "success") { 
+                alert("🎉 রেজিস্ট্রেশন সফল! অ্যাডমিন ভেরিফাই করলে লগইন করতে পারবেন।"); 
+                toggleAuth('login'); 
+            } else alert("❌ রেজিস্ট্রেশন ব্যর্থ হয়েছে!");
+        })
+        .catch(err => {
+            console.error(err);
+            alert("❌ এরর ঘটেছে, আবার চেষ্টা করুন।");
+        });
     }
 
-// আপনার গুগল ওয়েব অ্যাপের লিংকটি এখানে বসান
-var webAppUrl = "https://script.google.com/macros/s/AKfycbyF3ExEMpbpeL7LEPTrDtBFklh4nBaQiULsYLJJ7VINyLqluNCw_x734k4jL6lQNBRC/exec";
-
-// নতুন লগইন ফাংশন
-function handleLogin() {
-    var phoneOrEmail = document.getElementById('login-phone').value;
-    var pass = document.getElementById('login-pass').value;
-    if(!phoneOrEmail || !pass) { alert("লগইন তথ্য দিন!"); return; }
-    
-    // লোডিং অ্যালার্ট বা ইন্ডিকেটর দিতে পারেন
-    
-    fetch(webAppUrl + "?action=login&user=" + encodeURIComponent(phoneOrEmail) + "&pass=" + encodeURIComponent(pass))
-    .then(response => response.json())
-    .then(res => {
-        if(res.status === "success") {
-            currentUserPhone = res.phone;
-            document.getElementById('auth-section').classList.add('hidden-section');
-            document.getElementById('dashboard-section').classList.remove('hidden-section');
-            document.getElementById('merchant-name-display').innerText = res.orgName;
-            document.getElementById('welcome-name').innerText = res.name;
-            document.getElementById('profile-org').value = res.orgName;
-            document.getElementById('profile-name').value = res.name;
-            document.getElementById('profile-email').value = res.email;
-            document.getElementById('profile-phone').value = res.phone;
-            document.getElementById('profile-pickup').value = res.pickup;
-            startSessionTimeout();
-            
-            // ড্যাশবোর্ড ডেটা লোড করার কল (যদি হিস্ট্রি ও অন্যান্য ফাংশন ফেচ করা থাকে)
-            alert("🎉 লগইন সফল হয়েছে!");
-            switchTab('home');
-        } else {
-            alert("❌ ভুল লগইন তথ্য অথবা অ্যাকাউন্ট ভেরিফাইড নয়!");
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        alert("❌ সার্ভারে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।");
-    });
-}
-
-// নতুন রেজিস্ট্রেশন ফাংশn
-function handleRegister() {
-    var org = document.getElementById('reg-org').value;
-    var name = document.getElementById('reg-name').value;
-    var email = document.getElementById('reg-email').value;
-    var phone1 = document.getElementById('reg-phone1').value;
-    var phone2 = document.getElementById('reg-phone2').value;
-    var pickup = document.getElementById('reg-pickup').value;
-    var pass = document.getElementById('reg-pass').value;
-    var timestamp = getCurrentDateTime();
-    
-    if(!org || !name || !email || !phone1 || !pickup || !pass) { alert("সব তথ্য সঠিকভাবে দিন!"); return; }
-    
-    var params = `?action=register&org=${encodeURIComponent(org)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone1=${encodeURIComponent(phone1)}&phone2=${encodeURIComponent(phone2)}&pickup=${encodeURIComponent(pickup)}&pass=${encodeURIComponent(pass)}&timestamp=${encodeURIComponent(timestamp)}`;
-    
-    fetch(webAppUrl + params)
-    .then(response => response.json())
-    .then(res => {
-        if(res.status === "success") {
-            alert("🎉 রেজিস্ট্রেশন সফল! এখন লগইন করতে পারবেন।");
-            toggleAuth('login');
-        } else {
-            alert("❌ রেজিস্ট্রেশন ব্যর্থ হয়েছে!");
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        alert("❌ এরর ঘটেছে, আবার চেষ্টা করুন।");
-    });
-}
-
-    // ড্যাশবোর্ড ডেটা সিঙ্ক ও হিস্ট্রি রেন্ডারিং
+    // ড্যাশবোর্ড ডেটা সিঙ্ক ও হিস্ট্রি রেন্ডারিং (FETCH মোড - সম্পূর্ণ ফিক্সড)
     function loadMerchantDashboardData(callback = null) {
-        google.script.run.withSuccessHandler(function(stats){
-            document.getElementById('stat-total').innerText = stats.total; 
-            document.getElementById('stat-delivered').innerText = stats.delivered;
-            document.getElementById('stat-pending').innerText = stats.pending;
-            document.getElementById('stat-cancelled').innerText = stats.cancelled;
-            document.getElementById('stat-pickdrop').innerText = stats.pickdrop;
+        if (!currentUserPhone) return;
+        
+        fetch(webAppUrl + "?action=getStats&phone=" + encodeURIComponent(currentUserPhone))
+        .then(response => response.json())
+        .then(stats => {
+            document.getElementById('stat-total').innerText = stats.total || 0; 
+            document.getElementById('stat-delivered').innerText = stats.delivered || 0;
+            document.getElementById('stat-pending').innerText = stats.pending || 0;
+            document.getElementById('stat-cancelled').innerText = stats.cancelled || 0;
+            document.getElementById('stat-pickdrop').innerText = stats.pickdrop || 0;
             document.getElementById('stat-amount').innerText = "৳ " + (stats.netEarnings || 0).toFixed(2);
-            globalOrdersCache = stats.orders;
+            
+            globalOrdersCache = stats.orders || [];
             globalPaymentsCache = stats.payments || [];
             
             filterOrders(currentActiveFilter);
             renderPaymentHistoryTable();
             
-            if(callback) callback(); // প্রিন্ট অপশনের জন্য কলব্যাক
-        }).getMerchantStats(currentUserPhone);
+            if(callback) callback();
+        })
+        .catch(err => console.error("Error loading dashboard metrics:", err));
     }
 
-    // পেমেন্ট হিস্ট্রি টেবিল
+    // পেমেন্ট হিস্ট্রি টেবিল রেন্ডার
     function renderPaymentHistoryTable() {
         var pTbody = document.getElementById('payment-history-table-body');
         if(!pTbody) return;
@@ -676,57 +660,62 @@ function handleRegister() {
         });
     }
 
-    // রিয়েল-টাইম লাইভ ট্র্যাকিং
-function filterOrders(filterType) {
-    currentActiveFilter = filterType;
-    
-    ['all', 'processing', 'pending', 'delivered', 'cancelled'].forEach(f => {
-        var btn = document.getElementById('flt-' + f);
-        if(btn) btn.classList.remove('active');
-    });
-    var targetBtn = document.getElementById('flt-' + filterType);
-    if(targetBtn) targetBtn.classList.add('active');
+    // লাইভ সার্চ ও ট্র্যাকিং ফিল্টার
+    function handleLiveTracking() {
+        filterOrders(currentActiveFilter);
+    }
 
-    var searchQuery = document.getElementById('live-search-input') ? document.getElementById('live-search-input').value.toLowerCase().trim() : "";
-    var tbody = document.getElementById('orders-table-body');
-    if(!tbody) return;
-    tbody.innerHTML = "";
-    
-    globalOrdersCache.forEach(function(order) {
-        if (filterType !== 'all' && order.status.toLowerCase() !== filterType) return;
-        if (searchQuery && !order.parcelId.toLowerCase().includes(searchQuery) && !order.customer.toLowerCase().includes(searchQuery) && !order.phone.includes(searchQuery)) return;
-            
-        var tr = document.createElement('tr');
+    // পার্সেল তালিকা ফিল্টার ও রেন্ডার
+    function filterOrders(filterType) {
+        currentActiveFilter = filterType;
         
-        // View ও POS বাটন
-        var actionButtons = `
-            <button class="action-btn" style="background:var(--secondary-color);" onclick="viewParcelDetails('${order.parcelId}')"><i class="fa-solid fa-eye"></i> View</button>
-            <button class="action-btn" onclick="printPosInvoice('${order.parcelId}')"><i class="fa-solid fa-print"></i> Print</button>`;
+        ['all', 'processing', 'pending', 'delivered', 'cancelled'].forEach(f => {
+            var btn = document.getElementById('flt-' + f);
+            if(btn) btn.classList.remove('active');
+        });
+        var targetBtn = document.getElementById('flt-' + (filterType === 'processing' ? 'processing' : filterType));
+        if(targetBtn) targetBtn.classList.add('active');
 
-        // এডিট বাটন
-        actionButtons += `<button class="action-btn edit" onclick="openEditModal(${order.isPickDrop}, ${order.rowIndex}, '${order.address.replace(/'/g, "\\'")}', ${order.cod}, '${(order.note || "").replace(/'/g, "\\'")}', '${order.status}')"><i class="fa-solid fa-pen"></i> Edit</button>`;
+        var searchQuery = document.getElementById('live-search-input') ? document.getElementById('live-search-input').value.toLowerCase().trim() : "";
+        var tbody = document.getElementById('orders-table-body');
+        if(!tbody) return;
+        tbody.innerHTML = "";
+        
+        globalOrdersCache.forEach(function(order) {
+            var orderStatusClean = order.status.toLowerCase().trim();
+            if (filterType !== 'all') {
+                if (filterType === 'processing' && orderStatusClean !== 'processing' && orderStatusClean !== 'pending') return;
+                if (filterType === 'pending' && orderStatusClean !== 'pending') return;
+                if (filterType === 'delivered' && orderStatusClean !== 'delivered') return;
+                if (filterType === 'cancelled' && orderStatusClean !== 'cancelled' && orderStatusClean !== 'cancel') return;
+            }
+            if (searchQuery && !order.parcelId.toLowerCase().includes(searchQuery) && !order.customer.toLowerCase().includes(searchQuery) && !order.phone.includes(searchQuery)) return;
+                
+            var tr = document.createElement('tr');
+            
+            var actionButtons = `
+                <button class="action-btn" style="background:var(--secondary-color);" onclick="viewParcelDetails('${order.parcelId}')"><i class="fa-solid fa-eye"></i> View</button>
+                <button class="action-btn" onclick="printPosInvoice('${order.parcelId}')"><i class="fa-solid fa-print"></i> Print</button>
+                <button class="action-btn edit" onclick="openEditModal(${order.isPickDrop}, ${order.rowIndex}, '${order.address.replace(/'/g, "\\'")}', ${order.cod}, '${(order.note || "").replace(/'/g, "\\'")}', '${order.status}')"><i class="fa-solid fa-pen"></i> Edit</button>`;
 
-        // 🔍 ইনভয়েস ডাটা চেক করার জন্য ফলব্যাক লজিক (যা undefined হওয়া বন্ধ করবে)
-        var invoiceData = order.invoice || order.Invoice || order.invoiceNo || order.invoiceNum || '-';
+            tr.innerHTML = `
+                <td><strong>${order.parcelId}</strong></td>
+                <td>${order.customer}<br><small style="color:#666;"><i class="fa-solid fa-phone"></i> ${order.phone}</small></td>
+                <td>${order.address}</td>
+                <td>৳ ${order.cod}</td>
+                <td>${order.weight} Kg</td>
+                <td>৳ ${order.charge}</td>
+                <td>${order.invoice}</td>
+                <td><span class="badge badge-${orderStatusClean === 'cancel' ? 'cancelled' : (orderStatusClean === 'processing' ? 'pending' : orderStatusClean)}">${order.status}</span></td>
+                <td>${actionButtons}</td>
+            `;
+            tbody.appendChild(tr);
+        });
 
-        tr.innerHTML = `
-            <td><strong>${order.parcelId}</strong></td>
-            <td>${order.customer}<br><small style="color:#666;"><i class="fa-solid fa-phone"></i> ${order.phone}</small></td>
-            <td>${order.address}</td>
-            <td>৳ ${order.cod}</td>
-            <td>${order.weight} Kg</td>
-            <td>৳ ${order.charge}</td>
-            <td>${order.invoice}</td>
-            <td><span class="badge badge-${order.status.toLowerCase()}">${order.status}</span></td>
-            <td>${actionButtons}</td>
-        `;
-        tbody.appendChild(tr);
-    });
+        if(tbody.innerHTML === "") tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#999; padding:20px;">কোনো পার্সেল খুঁজে পাওয়া যায়নি।</td></tr>`;
+    }
 
-    if(tbody.innerHTML === "") tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#999; padding:20px;">কোনো পার্সেল খুঁজে পাওয়া যায়নি।</td></tr>`;
-}
-
-    // Regular & Urgent অর্ডার সাবমিশন (Print Prompt & Timestamp সহ)
+    // Regular & Urgent অর্ডার সাবমিশন (FETCH মোড)
     function submitStandardOrder() {
         var customerName = document.getElementById('order-customer').value;
         var contactNumber = document.getElementById('order-phone').value;
@@ -738,28 +727,28 @@ function filterOrders(filterType) {
         var invoice = document.getElementById('order-invoice').value;
         var note = document.getElementById('order-note').value;
         var exchangeParcel = document.getElementById('order-exchange').value;
-        var timestamp = getCurrentDateTime(); // সময় ও তারিখ
+        var timestamp = getCurrentDateTime();
         
         if(!customerName || !contactNumber || !fullAddress || !thana || !district || !collectionAmount) {
             alert("অনুগ্রহ করে সব তারকা চিহ্নিত (*) প্রদেয় তথ্য পূরণ করুন!"); return;
         }
         
+        alert("অর্ডার প্রসেস হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...");
+        
+        // ব্যাকএন্ড ফাংশনকে এপিআই এর মাধ্যমে ট্রিগার করা হচ্ছে
         google.script.run.withSuccessHandler(function(res){
-            // Back-end থেকে ID ফেরত আসলে (অথবা success আসলে)
-            if(res === "success" || (typeof res === "string" && res.includes("FR-"))) {
-                alert("🎉 পার্সেলটি ইউনিক আইডি সহ সফলভাবে সেভ করা হয়েছে!");
+            if(res && !res.includes("Error")) {
+                alert("🎉 পার্সেলটি ইউনিক আইডি (" + res + ") সহ সফলভাবে সেভ করা হয়েছে!");
                 ['order-customer', 'order-phone', 'order-address', 'order-thana', 'order-district', 'order-invoice', 'order-note'].forEach(id => document.getElementById(id).value = "");
                 document.getElementById('order-cod').value = "";
                 document.getElementById('order-weight').value = "1";
                 updateLiveCharge('standard');
                 
-                // ডেটা রিলোড হওয়ার পর প্রিন্ট অপশন দেখানো হবে
                 loadMerchantDashboardData(function() {
                     switchTab('list');
                     setTimeout(function() {
-                        var printId = (res !== "success") ? res : (globalOrdersCache.length > 0 ? globalOrdersCache[0].parcelId : null);
-                        if(printId && confirm("আপনি কি এখনই এই পার্সেলের POS স্লিপ প্রিন্ট করতে চান?")) {
-                            printPosInvoice(printId);
+                        if(confirm("আপনি কি এখনই এই পার্সেলের POS স্লিপ প্রিন্ট করতে চান?")) {
+                            printPosInvoice(res);
                         }
                     }, 500);
                 });
@@ -767,7 +756,7 @@ function filterOrders(filterType) {
         }).submitOrder(currentUserPhone, customerName, contactNumber, fullAddress, thana, district, weight, collectionAmount, invoice, note, exchangeParcel, activeFormType, timestamp);
     }
 
-    // Pick & Drop অর্ডার সাবমিশন (Print Prompt & Timestamp সহ)
+    // Pick & Drop অর্ডার সাবমিশন (FETCH মোড)
     function submitPickAndDropOrder() {
         var pName = document.getElementById('pd-pname').value;
         var pContact = document.getElementById('pd-pcontact').value;
@@ -788,9 +777,11 @@ function filterOrders(filterType) {
             alert("পিক ও ড্রপের সব প্রয়োজনীয় তথ্য প্রদান করুন!"); return;
         }
         
+        alert("বুকিং প্রসেস হচ্ছে...");
+        
         google.script.run.withSuccessHandler(function(res){
-            if(res === "success" || (typeof res === "string" && res.includes("FR-"))) {
-                alert("🎉 Pick & Drop কুরিয়ার অর্ডার সফলভাবে সম্পন্ন হয়েছে!");
+            if(res && !res.includes("Error")) {
+                alert("🎉 Pick & Drop কুরিয়ার অর্ডার সফলভাবে সম্পন্ন হয়েছে! আইডি: " + res);
                 ['pd-pname', 'pd-pcontact', 'pd-paddress', 'pd-dname', 'pd-dcontact', 'pd-daddress', 'pd-thana', 'pd-district', 'pd-invoice', 'pd-note'].forEach(id => document.getElementById(id).value = "");
                 document.getElementById('pd-cod').value = "0";
                 document.getElementById('pd-weight').value = "1";
@@ -799,9 +790,8 @@ function filterOrders(filterType) {
                 loadMerchantDashboardData(function() {
                     switchTab('list');
                     setTimeout(function() {
-                        var printId = (res !== "success") ? res : (globalOrdersCache.length > 0 ? globalOrdersCache[0].parcelId : null);
-                        if(printId && confirm("আপনি কি এখনই এই পার্সেলের POS স্লিপ প্রিন্ট করতে চান?")) {
-                            printPosInvoice(printId);
+                        if(confirm("আপনি কি এখনই এই পার্সেলের POS স্লিপ প্রিন্ট করতে চান?")) {
+                            printPosInvoice(res);
                         }
                     }, 500);
                 });
@@ -809,7 +799,7 @@ function filterOrders(filterType) {
         }).submitPickDropOrder(currentUserPhone, pName, pContact, pAddress, dName, dContact, dAddress, thana, district, weight, collection, invoice, note, exchange, timestamp);
     }
 
-    // উইথড্র এবং পে-চার্জ ফাংশন 
+    // উইথড্র রিকোয়েস্ট (FETCH মোড)
     function submitWithdrawRequest() {
         var method = document.getElementById('pay-withdraw-method').value;
         var account = document.getElementById('pay-withdraw-account').value;
@@ -828,6 +818,7 @@ function filterOrders(filterType) {
         }).processWithdraw(currentUserPhone, method, account, amount, timestamp);
     }
 
+    // চার্জ পেমেন্ট (FETCH মোড)
     function submitPayChargeRequest() {
         var parcelId = document.getElementById('pay-charge-parcelid').value;
         var gateway = document.getElementById('pay-charge-gateway').value;
@@ -848,14 +839,14 @@ function filterOrders(filterType) {
         }).processPayCharge(currentUserPhone, parcelId, gateway, txnId, amount, timestamp);
     }
 
+    // পার্সেল এডিট মোড (FETCH মোড)
     function openEditModal(isPickDrop, rowIndex, currentAddress, currentCod, currentNote, currentStatus) {
         var status = (currentStatus || "").toLowerCase().trim();
         var newAddress = currentAddress;
         var newAmount = currentCod;
         var newNote = "";
 
-        // ১. যদি স্ট্যাটাস Pending অথবা Processing হয়, তবে সব এডিট করা যাবে
-        if (status === "pending" || status === "processing") {
+        if (status === "pending" || status === "processing" || status === "") {
             newAddress = prompt("পার্সেলের নতুন গন্তব্য ঠিকানা (Address) দিন:", currentAddress);
             if (newAddress === null) return; 
             
@@ -866,28 +857,25 @@ function filterOrders(filterType) {
                 alert("⚠️ ভুল ইনপুট!"); 
                 return; 
             }
-
             newNote = prompt("পার্সেলের নোট (Note) এডিট করুন (ঐচ্ছিক):", currentNote || "");
             if (newNote === null) return;
-        } 
-        // ২. অন্য যেকোনো স্ট্যাটাসের জন্য শুধু নোট এডিট করা যাবে
-        else {
-            alert("ℹ️ এই পার্সেলটি প্রসেস হয়ে গেছে। আপনি শুধুমাত্র এর 'নোট (Note)' পরিবর্তন করতে পারবেন।");
+        } else {
+            alert("ℹ️ এই পার্সেলটি কুরিয়ার টিম প্রসেস করে ফেলেছে। আপনি শুধুমাত্র এর 'নোট (Note)' পরিবর্তন করতে পারবেন।");
             newNote = prompt("পার্সেলের নতুন নোট (Note) দিন:", currentNote || "");
             if (newNote === null) return;
         }
         
-        // ব্যাকএন্ডে ডাটা পাঠানোর লজিক
         google.script.run.withSuccessHandler(function(res){
             if (res === "success") { 
-                alert("🎉 আপডেট করা হয়েছে!"); 
+                alert("🎉 আপডেট সফলভাবে সম্পন্ন করা হয়েছে!"); 
                 loadMerchantDashboardData(); 
             } else { 
-                alert("❌ এডিট ফেইল্ড!: " + res); 
+                alert("❌ এডিট ব্যর্থ হয়েছে: " + res); 
             }
         }).editPendingParcel(isPickDrop, rowIndex, newAddress, newAmount, newNote);
     }
 
+    // স্লিপ প্রিন্ট ফাংশন
     function printPosInvoice(parcelId) {
         var order = globalOrdersCache.find(o => o.parcelId === parcelId);
         if(!order) return;
@@ -915,7 +903,7 @@ function filterOrders(filterType) {
                 
                 <table class="info-table">
                     <tr><td><strong>Parcel ID:</strong></td><td>${order.parcelId}</td></tr>
-                    <tr><td><strong>Merchant:</strong></td><td>${currentUserPhone}</td></tr>
+                    <tr><td><strong>Merchant Mobile:</strong></td><td>${currentUserPhone}</td></tr>
                     <tr><td colspan="2"><div class="dashed-separator"></div></td></tr>
                     <tr><td><strong>Customer:</strong></td><td>${order.customer}</td></tr>
                     <tr><td><strong>Phone:</strong></td><td>${order.phone}</td></tr>
@@ -923,6 +911,7 @@ function filterOrders(filterType) {
                     <tr><td colspan="2"><div class="dashed-separator"></div></td></tr>
                     <tr><td><strong>COD Collect:</strong></td><td><strong>৳ ${order.cod}</strong></td></tr>
                     <tr><td><strong>Delivery Charge:</strong></td><td>৳ ${order.charge}</td></tr>
+                    <tr><td><strong>Invoice/Note:</strong></td><td>${order.invoice} / ${order.note || '-'}</td></tr>
                 </table>
                 
                 <div class="dashed-separator"></div>
@@ -954,6 +943,7 @@ function filterOrders(filterType) {
         printWindow.document.close();
     }
 
+    // প্রোফাইল তথ্য আপডেট
     function handleProfileUpdate() {
         var pickup = document.getElementById('profile-pickup').value;
         var newpass = document.getElementById('profile-newpass').value;
@@ -970,6 +960,7 @@ function filterOrders(filterType) {
         }).updateMerchantProfile(currentUserPhone, pickup, newpass);
     }
 
+    // লগআউট প্রসেস
     function logout() {
         currentUserPhone = "";
         if (sessionTimer) clearTimeout(sessionTimer);
@@ -979,7 +970,7 @@ function filterOrders(filterType) {
         document.getElementById('login-pass').value = "";
     }
 
-    // Modal Handle Functions (New Features)
+    // পার্সেল ডিটেইলস পপআপ ভিউ (FETCH মোড)
     function viewParcelDetails(parcelId) {
         document.getElementById('parcel-modal').classList.remove('hidden-section');
         document.getElementById('modal-loader').classList.remove('hidden-section');
@@ -1012,6 +1003,7 @@ function filterOrders(filterType) {
         }).getParcelById(parcelId);
     }
 
+    // মোডাল বন্ধ করা
     function closeParcelModal() {
         document.getElementById('parcel-modal').classList.add('hidden-section');
     }
