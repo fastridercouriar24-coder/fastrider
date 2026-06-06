@@ -556,31 +556,76 @@
         }).registerUser(org, name, email, phone1, phone2, pickup, pass, timestamp); // timestamp পাঠানো হলো
     }
 
-    // মার্চেন্ট লগইন
-    function handleLogin() {
-        var phoneOrEmail = document.getElementById('login-phone').value;
-        var pass = document.getElementById('login-pass').value;
-        if(!phoneOrEmail || !pass) { alert("লগইন তথ্য দিন!"); return; }
-        
-        google.script.run.withSuccessHandler(function(res){
-            if(res.status === "blocked") alert("❌ অ্যাকাউন্ট ব্লকড!");
-            else if(res.status === "unverified") alert("⏳ অ্যাকাউন্ট এখনো ভেরিফাইড করা হয়নি।");
-            else if(res.status === "success") {
-                currentUserPhone = res.phone;
-                document.getElementById('auth-section').classList.add('hidden-section');
-                document.getElementById('dashboard-section').classList.remove('hidden-section');
-                document.getElementById('merchant-name-display').innerText = res.orgName;
-                document.getElementById('welcome-name').innerText = res.name;
-                document.getElementById('profile-org').value = res.orgName;
-                document.getElementById('profile-name').value = res.name;
-                document.getElementById('profile-email').value = res.email;
-                document.getElementById('profile-phone').value = res.phone;
-                document.getElementById('profile-pickup').value = res.pickup;
-                startSessionTimeout();
-                loadMerchantDashboardData();
-            } else alert("❌ ভুল লগইন তথ্য!");
-        }).loginUser(phoneOrEmail, pass);
-    }
+// আপনার গুগল ওয়েব অ্যাপের লিংকটি এখানে বসান
+var webAppUrl = "https://script.google.com/macros/s/AKfycbxcjHW0tY8SOkfJ27PPFtZvxCe48vImjkKgY8jMzvypcuUvH8OptYGilD8dGjb-8CoN/exec";
+
+// নতুন লগইন ফাংশন
+function handleLogin() {
+    var phoneOrEmail = document.getElementById('login-phone').value;
+    var pass = document.getElementById('login-pass').value;
+    if(!phoneOrEmail || !pass) { alert("লগইন তথ্য দিন!"); return; }
+    
+    // লোডিং অ্যালার্ট বা ইন্ডিকেটর দিতে পারেন
+    
+    fetch(webAppUrl + "?action=login&user=" + encodeURIComponent(phoneOrEmail) + "&pass=" + encodeURIComponent(pass))
+    .then(response => response.json())
+    .then(res => {
+        if(res.status === "success") {
+            currentUserPhone = res.phone;
+            document.getElementById('auth-section').classList.add('hidden-section');
+            document.getElementById('dashboard-section').classList.remove('hidden-section');
+            document.getElementById('merchant-name-display').innerText = res.orgName;
+            document.getElementById('welcome-name').innerText = res.name;
+            document.getElementById('profile-org').value = res.orgName;
+            document.getElementById('profile-name').value = res.name;
+            document.getElementById('profile-email').value = res.email;
+            document.getElementById('profile-phone').value = res.phone;
+            document.getElementById('profile-pickup').value = res.pickup;
+            startSessionTimeout();
+            
+            // ড্যাশবোর্ড ডেটা লোড করার কল (যদি হিস্ট্রি ও অন্যান্য ফাংশন ফেচ করা থাকে)
+            alert("🎉 লগইন সফল হয়েছে!");
+            switchTab('home');
+        } else {
+            alert("❌ ভুল লগইন তথ্য অথবা অ্যাকাউন্ট ভেরিফাইড নয়!");
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("❌ সার্ভারে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।");
+    });
+}
+
+// নতুন রেজিস্ট্রেশন ফাংশn
+function handleRegister() {
+    var org = document.getElementById('reg-org').value;
+    var name = document.getElementById('reg-name').value;
+    var email = document.getElementById('reg-email').value;
+    var phone1 = document.getElementById('reg-phone1').value;
+    var phone2 = document.getElementById('reg-phone2').value;
+    var pickup = document.getElementById('reg-pickup').value;
+    var pass = document.getElementById('reg-pass').value;
+    var timestamp = getCurrentDateTime();
+    
+    if(!org || !name || !email || !phone1 || !pickup || !pass) { alert("সব তথ্য সঠিকভাবে দিন!"); return; }
+    
+    var params = `?action=register&org=${encodeURIComponent(org)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone1=${encodeURIComponent(phone1)}&phone2=${encodeURIComponent(phone2)}&pickup=${encodeURIComponent(pickup)}&pass=${encodeURIComponent(pass)}&timestamp=${encodeURIComponent(timestamp)}`;
+    
+    fetch(webAppUrl + params)
+    .then(response => response.json())
+    .then(res => {
+        if(res.status === "success") {
+            alert("🎉 রেজিস্ট্রেশন সফল! এখন লগইন করতে পারবেন।");
+            toggleAuth('login');
+        } else {
+            alert("❌ রেজিস্ট্রেশন ব্যর্থ হয়েছে!");
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("❌ এরর ঘটেছে, আবার চেষ্টা করুন।");
+    });
+}
 
     // ড্যাশবোর্ড ডেটা সিঙ্ক ও হিস্ট্রি রেন্ডারিং
     function loadMerchantDashboardData(callback = null) {
