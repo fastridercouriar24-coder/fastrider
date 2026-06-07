@@ -763,49 +763,7 @@ This file is a starter copy for further integration.
         }).submitOrder(currentUserPhone, customerName, contactNumber, fullAddress, thana, district, weight, collectionAmount, invoice, note, exchangeParcel, activeFormType, timestamp);
     }
 
-    // Pick & Drop অর্ডার সাবমিশন (FETCH মোড)
-    function submitPickAndDropOrder() {
-        var pName = document.getElementById('pd-pname').value;
-        var pContact = document.getElementById('pd-pcontact').value;
-        var pAddress = document.getElementById('pd-paddress').value;
-        var dName = document.getElementById('pd-dname').value;
-        var dContact = document.getElementById('pd-dcontact').value;
-        var dAddress = document.getElementById('pd-daddress').value;
-        var thana = document.getElementById('pd-thana').value;
-        var district = document.getElementById('pd-district').value;
-        var weight = document.getElementById('pd-weight').value;
-        var collection = document.getElementById('pd-cod').value;
-        var invoice = document.getElementById('pd-invoice').value;
-        var note = document.getElementById('pd-note').value;
-        var exchange = document.getElementById('pd-exchange').value;
-        var timestamp = getCurrentDateTime();
-        
-        if(!pName || !pContact || !pAddress || !dName || !dContact || !dAddress || !thana || !district) {
-            alert("পিক ও ড্রপের সব প্রয়োজনীয় তথ্য প্রদান করুন!"); return;
-        }
-        
-        alert("বুকিং প্রসেস হচ্ছে...");
-        
-        google.script.run.withSuccessHandler(function(res){
-            if(res && !res.includes("Error")) {
-                alert("🎉 Pick & Drop কুরিয়ার অর্ডার সফলভাবে সম্পন্ন হয়েছে! আইডি: " + res);
-                ['pd-pname', 'pd-pcontact', 'pd-paddress', 'pd-dname', 'pd-dcontact', 'pd-daddress', 'pd-thana', 'pd-district', 'pd-invoice', 'pd-note'].forEach(id => document.getElementById(id).value = "");
-                document.getElementById('pd-cod').value = "0";
-                document.getElementById('pd-weight').value = "1";
-                updateLiveCharge('pickdrop');
-                
-                loadMerchantDashboardData(function() {
-                    switchTab('list');
-                    setTimeout(function() {
-                        if(confirm("আপনি কি এখনই এই পার্সেলের POS স্লিপ প্রিন্ট করতে চান?")) {
-                            printPosInvoice(res);
-                        }
-                    }, 500);
-                });
-            } else { alert("❌ বুকিং করতে ব্যর্থ: " + res); }
-        }).submitPickDropOrder(currentUserPhone, pName, pContact, pAddress, dName, dContact, dAddress, thana, district, weight, collection, invoice, note, exchange, timestamp);
-    }
-
+    https://script.google.com/macros/s/AKfycby3EfbiS_VGlf0HTSRm1vCk-TABZniKr5EBVFm0w6Ei6gPYFkJS1eT5T2KRCjJMf7V-/exec
     // উইথড্র রিকোয়েস্ট (FETCH মোড)
     function submitWithdrawRequest() {
         var method = document.getElementById('pay-withdraw-method').value;
