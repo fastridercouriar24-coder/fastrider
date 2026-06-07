@@ -459,585 +459,222 @@ This file is a starter copy for further integration.
     </div>
 
     <script>
-    var currentUserPhone = "";
-    var sessionTimer = null;
-    var activeFormType = "Regular";
-    var currentActiveFilter = "all";
-    var globalOrdersCache = [];
-    var globalPaymentsCache = [];
+   var currentUserPhone = "";
+var sessionTimer = null;
+var activeFormType = "Regular";
+var currentActiveFilter = "all";
+var globalOrdersCache = [];
+var globalPaymentsCache = [];
+
+// আপনার গুগল ওয়েব অ্যাপের আসল লিংকটি এখানে দেওয়া আছে
+var webAppUrl = "https://script.google.com/macros/s/AKfycby3EfbiS_VGlf0HTSRm1vCk-TABZniKr5EBVFm0w6Ei6gPYFkJS1eT5T2KRCjJMf7V-/exec";
+
+// বর্তমান সময় এবং তারিখ নেওয়ার ফাংশন
+function getCurrentDateTime() {
+    return new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
+}
+
+// মোবাইল সাইডবার টগল
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('show');
+}
+
+// ট্যাব সুইচিং
+function switchTab(tabName) {
+    ['home', 'order', 'list', 'payment', 'profile'].forEach(t => {
+        document.getElementById('tab-' + t).classList.add('hidden-section');
+        var menuEl = document.getElementById('menu-' + t);
+        if(menuEl) menuEl.classList.remove('active');
+    });
+    document.getElementById('tab-' + tabName).classList.remove('hidden-section');
+    var activeMenu = document.getElementById('menu-' + tabName);
+    if(activeMenu) activeMenu.classList.add('active');
     
-    // আপনার গুগল ওয়েব অ্যাপের আসল লিংকটি এখানে দেওয়া আছে
-    var webAppUrl = "https://script.google.com/macros/s/AKfycby3EfbiS_VGlf0HTSRm1vCk-TABZniKr5EBVFm0w6Ei6gPYFkJS1eT5T2KRCjJMf7V-/exec";
+    // Hide sidebar on mobile after clicking a tab
+    document.getElementById('sidebar').classList.remove('show');
+    
+    if(tabName === 'list') { filterOrders(currentActiveFilter); }
+}
 
-    // বর্তমান সময় এবং তারিখ নেওয়ার ফাংশন
-    function getCurrentDateTime() {
-        return new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" });
+// হোম ভিউ রিসেট
+function resetToHomeView() {
+    if (currentUserPhone) { switchTab('home'); }
+}
+
+// অটো লগআউট টাইমার
+function startSessionTimeout() {
+    if (sessionTimer) clearTimeout(sessionTimer);
+    sessionTimer = setTimeout(function() {
+        alert("⚠️ নিরাপত্তা সুরক্ষার্থে আপনার সেশনটি শেষ হয়েছে। অনুগ্রহ করে আবার লগইন করুন।");
+        logout();
+    }, 30 * 60 * 1000);
+}
+
+// অথোরাইজেশন ফর্ম স্যুইচ
+function toggleAuth(type) {
+    document.getElementById('login-form').classList.toggle('hidden-section', type === 'register');
+    document.getElementById('register-form').classList.toggle('hidden-section', type === 'login');
+}
+
+// ফর্ম টাইপ রেন্ডারিং
+function showOrderForm(type) {
+    activeFormType = type;
+    if (type === 'Regular' || type === 'Urgent') {
+        document.getElementById('form-standard').classList.remove('hidden-section');
+        document.getElementById('form-pickdrop').classList.add('hidden-section');
+        document.getElementById('form-type-title').innerText = type;
+        updateLiveCharge('standard');
+    } else if (type === 'PickDrop') {
+        document.getElementById('form-standard').classList.add('hidden-section');
+        document.getElementById('form-pickdrop').classList.remove('hidden-section');
+        updateLiveCharge('pickdrop');
     }
+}
 
-    // মোবাইল সাইডবার টগল
-    function toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('show');
+// লাইভ চার্জ ক্যালকুলেশন
+function updateLiveCharge(formId) {
+    let weightInput = formId === 'standard' ? 'order-weight' : 'pd-weight';
+    let labelId = formId === 'standard' ? 'live-charge-standard' : 'live-charge-pickdrop';
+    let w = parseFloat(document.getElementById(weightInput).value) || 0;
+    let charge = 0;
+    if (w > 0) {
+        if (w <= 1) charge = 60;
+        else if (w <= 2) charge = 80;
+        else if (w <= 3) charge = 100;
+        else charge = 100 + (Math.ceil(w - 3) * 20);
     }
+    document.getElementById(labelId).innerText = "৳ " + charge;
+}
 
-    // ট্যাব সুইচিং
-    function switchTab(tabName) {
-        ['home', 'order', 'list', 'payment', 'profile'].forEach(t => {
-            document.getElementById('tab-' + t).classList.add('hidden-section');
-            var menuEl = document.getElementById('menu-' + t);
-            if(menuEl) menuEl.classList.remove('active');
-        });
-        document.getElementById('tab-' + tabName).classList.remove('hidden-section');
-        var activeMenu = document.getElementById('menu-' + tabName);
-        if(activeMenu) activeMenu.classList.add('active');
-        
-        // Hide sidebar on mobile after clicking a tab
-        document.getElementById('sidebar').classList.remove('show');
-        
-        if(tabName === 'list') { filterOrders(currentActiveFilter); }
-    }
-
-    // হোম ভিউ রিসেট
-    function resetToHomeView() {
-        if (currentUserPhone) { switchTab('home'); }
-    }
-
-    // অটো লগআউট টাইমার
-    function startSessionTimeout() {
-        if (sessionTimer) clearTimeout(sessionTimer);
-        sessionTimer = setTimeout(function() {
-            alert("⚠️ নিরাপত্তা সুরক্ষার্থে আপনার সেশনটি শেষ হয়েছে। অনুগ্রহ করে আবার লগইন করুন।");
-            logout();
-        }, 30 * 60 * 1000);
-    }
-
-    // অথোরাইজেশন ফর্ম স্যুইচ
-    function toggleAuth(type) {
-        document.getElementById('login-form').classList.toggle('hidden-section', type === 'register');
-        document.getElementById('register-form').classList.toggle('hidden-section', type === 'login');
-    }
-
-    // ফর্ম টাইপ রেন্ডারিং
-    function showOrderForm(type) {
-        activeFormType = type;
-        if (type === 'Regular' || type === 'Urgent') {
-            document.getElementById('form-standard').classList.remove('hidden-section');
-            document.getElementById('form-pickdrop').classList.add('hidden-section');
-            document.getElementById('form-type-title').innerText = type;
-            updateLiveCharge('standard');
-        } else if (type === 'PickDrop') {
-            document.getElementById('form-standard').classList.add('hidden-section');
-            document.getElementById('form-pickdrop').classList.remove('hidden-section');
-            updateLiveCharge('pickdrop');
-        }
-    }
-
-    // লাইভ চার্জ ক্যালকুলেশন
-    function updateLiveCharge(formId) {
-        let weightInput = formId === 'standard' ? 'order-weight' : 'pd-weight';
-        let labelId = formId === 'standard' ? 'live-charge-standard' : 'live-charge-pickdrop';
-        let w = parseFloat(document.getElementById(weightInput).value) || 0;
-        let charge = 0;
-        if (w > 0) {
-            if (w <= 1) charge = 60;
-            else if (w <= 2) charge = 80;
-            else if (w <= 3) charge = 100;
-            else charge = 100 + (Math.ceil(w - 3) * 20);
-        }
-        document.getElementById(labelId).innerText = "৳ " + charge;
-    }
-
-    // মার্চেন্ট লগইন (FETCH মোড - ফিক্সড)
-    function handleLogin() {
-        var phoneOrEmail = document.getElementById('login-phone').value;
-        var pass = document.getElementById('login-pass').value;
-        if(!phoneOrEmail || !pass) { alert("লগইন তথ্য দিন!"); return; }
-        
-        fetch(webAppUrl + "?action=login&user=" + encodeURIComponent(phoneOrEmail) + "&pass=" + encodeURIComponent(pass))
-        .then(response => response.json())
-        .then(res => {
-            if(res.status === "blocked") alert("❌ অ্যাকাউন্ট ব্লকড!");
-            else if(res.status === "unverified") alert("⏳ অ্যাকাউন্ট এখনো ভেরিফাইড করা হয়নি।");
-            else if(res.status === "success") {
-                currentUserPhone = res.phone;
-                document.getElementById('auth-section').classList.add('hidden-section');
-                document.getElementById('dashboard-section').classList.remove('hidden-section');
-                document.getElementById('merchant-name-display').innerText = res.orgName;
-                document.getElementById('welcome-name').innerText = res.name;
-                document.getElementById('profile-org').value = res.orgName;
-                document.getElementById('profile-name').value = res.name;
-                document.getElementById('profile-email').value = res.email;
-                document.getElementById('profile-phone').value = res.phone;
-                document.getElementById('profile-pickup').value = res.pickup;
-                startSessionTimeout();
-                
-                // লগইন এর পর ড্যাশবোর্ড ডাটা রিয়েলটাইম লোড করবে
-                loadMerchantDashboardData();
-                alert("🎉 লগইন সফল হয়েছে!");
-            } else alert("❌ ভুল লগইন তথ্য!");
-        })
-        .catch(err => {
-            console.error(err);
-            alert("❌ সার্ভারে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।");
-        });
-    }
-
-    // মার্চেন্ট রেজিস্ট্রেশন (FETCH মোড - ফিক্সড)
-    function handleRegister() {
-        var org = document.getElementById('reg-org').value;
-        var name = document.getElementById('reg-name').value;
-        var email = document.getElementById('reg-email').value;
-        var phone1 = document.getElementById('reg-phone1').value;
-        var phone2 = document.getElementById('reg-phone2').value;
-        var pickup = document.getElementById('reg-pickup').value;
-        var pass = document.getElementById('reg-pass').value;
-        var timestamp = getCurrentDateTime();
-        
-        if(!org || !name || !email || !phone1 || !pickup || !pass) { alert("সব তথ্য সঠিকভাবে দিন!"); return; }
-        
-        var params = `?action=register&org=${encodeURIComponent(org)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone1=${encodeURIComponent(phone1)}&phone2=${encodeURIComponent(phone2)}&pickup=${encodeURIComponent(pickup)}&pass=${encodeURIComponent(pass)}&timestamp=${encodeURIComponent(timestamp)}`;
-        
-        fetch(webAppUrl + params)
-        .then(response => response.json())
-        .then(res => {
-            if(res.status === "email_exists") alert("❌ এই ইমেইল ইতিমধ্যে ব্যবহৃত!");
-            else if(res.status === "phone_exists") alert("❌ এই ফোন নম্বর ইতিমধ্যে ব্যবহৃত!");
-            else if(res.status === "success") { 
-                alert("🎉 রেজিস্ট্রেশন সফল! অ্যাডমিন ভেরিফাই করলে লগইন করতে পারবেন।"); 
-                toggleAuth('login'); 
-            } else alert("❌ রেজিস্ট্রেশন ব্যর্থ হয়েছে!");
-        })
-        .catch(err => {
-            console.error(err);
-            alert("❌ এরর ঘটেছে, আবার চেষ্টা করুন।");
-        });
-    }
-
-    // ড্যাশবোর্ড ডেটা সিঙ্ক ও হিস্ট্রি রেন্ডারিং (FETCH মোড - সম্পূর্ণ ফিক্সড)
-    function loadMerchantDashboardData(callback = null) {
-        if (!currentUserPhone) return;
-        
-        fetch(webAppUrl + "?action=getStats&phone=" + encodeURIComponent(currentUserPhone))
-        .then(response => response.json())
-        .then(stats => {
-            document.getElementById('stat-total').innerText = stats.total || 0; 
-            document.getElementById('stat-delivered').innerText = stats.delivered || 0;
-            document.getElementById('stat-pending').innerText = stats.pending || 0;
-            document.getElementById('stat-cancelled').innerText = stats.cancelled || 0;
-            document.getElementById('stat-pickdrop').innerText = stats.pickdrop || 0;
-            document.getElementById('stat-amount').innerText = "৳ " + (stats.netEarnings || 0).toFixed(2);
+// মার্চেন্ট লগইন (FETCH মোড - ফিক্সড)
+function handleLogin() {
+    var phoneOrEmail = document.getElementById('login-phone').value;
+    var pass = document.getElementById('login-pass').value;
+    if(!phoneOrEmail || !pass) { alert("লগইন তথ্য দিন!"); return; }
+    
+    fetch(webAppUrl + "?action=login&user=" + encodeURIComponent(phoneOrEmail) + "&pass=" + encodeURIComponent(pass))
+    .then(response => response.json())
+    .then(res => {
+        if(res.status === "blocked") alert("❌ অ্যাকাউন্ট ব্লকড!");
+        else if(res.status === "unverified") alert("⏳ অ্যাকাউন্ট এখনো ভেরিফাইড করা হয়নি।");
+        else if(res.status === "success") {
+            currentUserPhone = res.phone;
+            document.getElementById('auth-section').classList.add('hidden-section');
+            document.getElementById('dashboard-section').classList.remove('hidden-section');
+            document.getElementById('merchant-name-display').innerText = res.orgName;
+            document.getElementById('welcome-name').innerText = res.name;
+            document.getElementById('profile-org').value = res.orgName;
+            document.getElementById('profile-name').value = res.name;
+            document.getElementById('profile-email').value = res.email;
+            document.getElementById('profile-phone').value = res.phone;
+            document.getElementById('profile-pickup').value = res.pickup;
+            startSessionTimeout();
             
-            globalOrdersCache = stats.orders || [];
-            globalPaymentsCache = stats.payments || [];
-            
-            filterOrders(currentActiveFilter);
-            renderPaymentHistoryTable();
-            
-            if(callback) callback();
-        })
-        .catch(err => console.error("Error loading dashboard metrics:", err));
-    }
+            // লগইন এর পর ড্যাশবোর্ড ডাটা রিয়েলটাইম লোড করবে
+            loadMerchantDashboardData();
+            alert("🎉 লগইন সফল হয়েছে!");
+        } else alert("❌ ভুল লগইন তথ্য!");
+    })
+    .catch(err => {
+        console.error(err);
+        alert("❌ সার্ভারে যোগাযোগ করা যাচ্ছে না। আবার চেষ্টা করুন।");
+    });
+}
 
-    // পেমেন্ট হিস্ট্রি টেবিল রেন্ডার
-    function renderPaymentHistoryTable() {
-        var pTbody = document.getElementById('payment-history-table-body');
-        if(!pTbody) return;
-        pTbody.innerHTML = "";
-        
-        if(globalPaymentsCache.length === 0) {
-            pTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">কোনো পেমেন্ট রেকর্ড পাওয়া যায়নি।</td></tr>`;
-            return;
-        }
-        
-        globalPaymentsCache.forEach(function(pay) {
-            var tr = document.createElement('tr');
-            var statusBadgeClass = "badge-pending";
-            if(pay.status.toLowerCase() === 'paid' || pay.status.toLowerCase() === 'success') statusBadgeClass = "badge-delivered";
-            if(pay.status.toLowerCase() === 'failed' || pay.status.toLowerCase() === 'cancelled') statusBadgeClass = "badge-cancelled";
-            
-            tr.innerHTML = `
-                <td>${pay.date}</td>
-                <td><strong>${pay.type}</strong></td>
-                <td><span style="color:#555;"><i class="fa-solid fa-credit-card"></i> ${pay.method}</span></td>
-                <td>${pay.details}</td>
-                <td><strong style="color: ${pay.type==='Pay Charge'?'#f44336':'#4caf50'};">${pay.type==='Pay Charge'?'-':'+'} ৳ ${pay.amount}</strong></td>
-                <td><code style="background:#eee; padding:2px 6px; border-radius:4px;">${pay.txnId}</code></td>
-                <td><span class="badge ${statusBadgeClass}">${pay.status}</span></td>
-            `;
-            pTbody.appendChild(tr);
-        });
-    }
-
-    // লাইভ সার্চ ও ট্র্যাকিং ফিল্টার
-    function handleLiveTracking() {
-        filterOrders(currentActiveFilter);
-    }
-
-    // পার্সেল তালিকা ফিল্টার ও রেন্ডার
-    function filterOrders(filterType) {
-        currentActiveFilter = filterType;
-        
-        ['all', 'processing', 'pending', 'delivered', 'cancelled'].forEach(f => {
-            var btn = document.getElementById('flt-' + f);
-            if(btn) btn.classList.remove('active');
-        });
-        var targetBtn = document.getElementById('flt-' + (filterType === 'processing' ? 'processing' : filterType));
-        if(targetBtn) targetBtn.classList.add('active');
-
-        var searchQuery = document.getElementById('live-search-input') ? document.getElementById('live-search-input').value.toLowerCase().trim() : "";
-        var tbody = document.getElementById('orders-table-body');
-        if(!tbody) return;
-        tbody.innerHTML = "";
-        
-        globalOrdersCache.forEach(function(order) {
-            var orderStatusClean = order.status.toLowerCase().trim();
-            if (filterType !== 'all') {
-                if (filterType === 'processing' && orderStatusClean !== 'processing' && orderStatusClean !== 'pending') return;
-                if (filterType === 'pending' && orderStatusClean !== 'pending') return;
-                if (filterType === 'delivered' && orderStatusClean !== 'delivered') return;
-                if (filterType === 'cancelled' && orderStatusClean !== 'cancelled' && orderStatusClean !== 'cancel') return;
-            }
-            if (searchQuery && !order.parcelId.toLowerCase().includes(searchQuery) && !order.customer.toLowerCase().includes(searchQuery) && !order.phone.includes(searchQuery)) return;
-                
-            var tr = document.createElement('tr');
-            
-            var actionButtons = `
-                <button class="action-btn" style="background:var(--secondary-color);" onclick="viewParcelDetails('${order.parcelId}')"><i class="fa-solid fa-eye"></i> View</button>
-                <button class="action-btn" onclick="printPosInvoice('${order.parcelId}')"><i class="fa-solid fa-print"></i> Print</button>
-                <button class="action-btn edit" onclick="openEditModal(${order.isPickDrop}, ${order.rowIndex}, '${order.address.replace(/'/g, "\\'")}', ${order.cod}, '${(order.note || "").replace(/'/g, "\\'")}', '${order.status}')"><i class="fa-solid fa-pen"></i> Edit</button>`;
-
-            tr.innerHTML = `
-                <td><strong>${order.parcelId}</strong></td>
-                <td>${order.customer}<br><small style="color:#666;"><i class="fa-solid fa-phone"></i> ${order.phone}</small></td>
-                <td>${order.address}</td>
-                <td>৳ ${order.cod}</td>
-                <td>${order.weight} Kg</td>
-                <td>৳ ${order.charge}</td>
-                <td>${order.invoice}</td>
-                <td><span class="badge badge-${orderStatusClean === 'cancel' ? 'cancelled' : (orderStatusClean === 'processing' ? 'pending' : orderStatusClean)}">${order.status}</span></td>
-                <td>${actionButtons}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        if(tbody.innerHTML === "") tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#999; padding:20px;">কোনো পার্সেল খুঁজে পাওয়া যায়নি।</td></tr>`;
-    }
-
-   // Regular & Urgent অর্ডার সাবমিশন (FETCH মোড)
-function submitStandardOrder() {
-    var customerName = document.getElementById('order-customer').value;
-    var contactNumber = document.getElementById('order-phone').value;
-    var fullAddress = document.getElementById('order-address').value;
-    var thana = document.getElementById('order-thana').value;
-    var district = document.getElementById('order-district').value;
-    var weight = document.getElementById('order-weight').value;
-    var collectionAmount = document.getElementById('order-cod').value;
-    var invoice = document.getElementById('order-invoice').value;
-    var note = document.getElementById('order-note').value;
-    var exchangeParcel = document.getElementById('order-exchange').value;
+// মার্চেন্ট রেজিস্ট্রেশন (FETCH মোড - ফিক্সড)
+function handleRegister() {
+    var org = document.getElementById('reg-org').value;
+    var name = document.getElementById('reg-name').value;
+    var email = document.getElementById('reg-email').value;
+    var phone1 = document.getElementById('reg-phone1').value;
+    var phone2 = document.getElementById('reg-phone2').value;
+    var pickup = document.getElementById('reg-pickup').value;
+    var pass = document.getElementById('reg-pass').value;
     var timestamp = getCurrentDateTime();
+    
+    if(!org || !name || !email || !phone1 || !pickup || !pass) { alert("সব তথ্য সঠিকভাবে দিন!"); return; }
+    
+    var params = `?action=register&org=${encodeURIComponent(org)}&name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}&phone1=${encodeURIComponent(phone1)}&phone2=${encodeURIComponent(phone2)}&pickup=${encodeURIComponent(pickup)}&pass=${encodeURIComponent(pass)}&timestamp=${encodeURIComponent(timestamp)}`;
+    
+    fetch(webAppUrl + params)
+    .then(response => response.json())
+    .then(res => {
+        if(res.status === "email_exists") alert("❌ এই ইমেইল ইতিমধ্যে ব্যবহৃত!");
+        else if(res.status === "phone_exists") alert("❌ এই ফোন নম্বর ইতিমধ্যে ব্যবহৃত!");
+        else if(res.status === "success") { 
+            alert("🎉 রেজিস্ট্রেশন সফল! অ্যাডমিন ভেরিফাই করলে লগইন করতে পারবেন।"); 
+            toggleAuth('login'); 
+        } else alert("❌ রেজিস্ট্রেশন ব্যর্থ হয়েছে!");
+    })
+    .catch(err => {
+        console.error(err);
+        alert("❌ এরর ঘটেছে, আবার চেষ্টা করুন।");
+    });
+}
 
-    if (!customerName || !contactNumber || !fullAddress || !thana || !district || !collectionAmount) {
-        alert("অনুগ্রহ করে সব তারকা চিহ্নিত (*) প্রদেয় তথ্য পূরণ করুন!");
+// ড্যাশবোর্ড ডেটা সিঙ্ক ও হিস্ট্রি রেন্ডারিং (FETCH মোড - সম্পূর্ণ ফিক্সড)
+function loadMerchantDashboardData(callback = null) {
+    if (!currentUserPhone) return;
+    
+    fetch(webAppUrl + "?action=getStats&phone=" + encodeURIComponent(currentUserPhone))
+    .then(response => response.json())
+    .then(stats => {
+        document.getElementById('stat-total').innerText = stats.total || 0; 
+        document.getElementById('stat-delivered').innerText = stats.delivered || 0;
+        document.getElementById('stat-pending').innerText = stats.pending || 0;
+        document.getElementById('stat-cancelled').innerText = stats.cancelled || 0;
+        document.getElementById('stat-pickdrop').innerText = stats.pickdrop || 0;
+        document.getElementById('stat-amount').innerText = "৳ " + (stats.netEarnings || 0).toFixed(2);
+        
+        globalOrdersCache = stats.orders || [];
+        globalPaymentsCache = stats.payments || [];
+        
+        filterOrders(currentActiveFilter);
+        renderPaymentHistoryTable();
+        
+        if(callback) callback();
+    })
+    .catch(err => console.error("Error loading dashboard metrics:", err));
+}
+
+// পেমেন্ট হিস্ট্রি টেবিল রেন্ডার
+function renderPaymentHistoryTable() {
+    var pTbody = document.getElementById('payment-history-table-body');
+    if(!pTbody) return;
+    pTbody.innerHTML = "";
+    
+    if(globalPaymentsCache.length === 0) {
+        pTbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#999; padding:20px;">কোনো পেমেন্ট রেকর্ড পাওয়া যায়নি।</td></tr>`;
         return;
     }
-
-    alert("অর্ডার প্রসেস হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...");
-
-    // Web App URL এখানে বসান
-    var url = "https://script.google.com/macros/s/AKfycby3EfbiS_VGlf0HTSRm1vCk-TABZniKr5EBVFm0w6Ei6gPYFkJS1eT5T2KRCjJMf7V-/exec"; 
-
-    var data = {
-        currentUserPhone: currentUserPhone,
-        customerName: customerName,
-        contactNumber: contactNumber,
-        fullAddress: fullAddress,
-        thana: thana,
-        district: district,
-        weight: weight,
-        collectionAmount: collectionAmount,
-        invoice: invoice,
-        note: note,
-        exchangeParcel: exchangeParcel,
-        activeFormType: activeFormType,
-        timestamp: timestamp
-    };
-
-    fetch(url, {
-        method: 'POST',
-        mode: 'no-cors', // অথবা 'cors' যদি প্রয়োজন হয়
-        cache: 'no-cache',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.text())
-    .then(res => {
-        if (res && !res.includes("Error")) {
-            alert("🎉 পার্সেলটি ইউনিক আইডি (" + res + ") সহ সফলভাবে সেভ করা হয়েছে!");
-            // ফর্ম ক্লিয়ার করা
-            ['order-customer', 'order-phone', 'order-address', 'order-thana', 'order-district', 'order-invoice', 'order-note'].forEach(id => document.getElementById(id).value = "");
-            document.getElementById('order-cod').value = "";
-            document.getElementById('order-weight').value = "1";
-            updateLiveCharge('standard');
-
-            loadMerchantDashboardData(function() {
-                switchTab('list');
-                setTimeout(function() {
-                    if (confirm("আপনি কি এখনই এই পার্সেলের POS স্লিপ প্রিন্ট করতে চান?")) {
-                        printPosInvoice(res);
-                    }
-                }, 500);
-            });
-        } else {
-            alert("❌ পার্সেল সাবমিট করতে ত্রুটি ঘটেছে: " + res);
-        }
-    })
-    .catch(error => {
-        alert("❌ নেটওয়ার্ক ত্রুটি: " + error);
-    });
-}
-
-function submitPickAndDropOrder() {
-    var data = {
-        action: 'submitPickDropOrder',
-        currentUserPhone: currentUserPhone,
-        pName: document.getElementById('pd-pname').value,
-        pContact: document.getElementById('pd-pcontact').value,
-        pAddress: document.getElementById('pd-paddress').value,
-        dName: document.getElementById('pd-dname').value,
-        dContact: document.getElementById('pd-dcontact').value,
-        dAddress: document.getElementById('pd-daddress').value,
-        thana: document.getElementById('pd-thana').value,
-        district: document.getElementById('pd-district').value,
-        weight: document.getElementById('pd-weight').value,
-        collection: document.getElementById('pd-cod').value,
-        invoice: document.getElementById('pd-invoice').value,
-        note: document.getElementById('pd-note').value,
-        exchange: document.getElementById('pd-exchange').value,
-        timestamp: getCurrentDateTime()
-    };
-
-    if(!data.pName || !data.pContact || !data.dName || !data.dContact) {
-        alert("পিক ও ড্রপের সব প্রয়োজনীয় তথ্য প্রদান করুন!"); return;
-    }
-
-    fetch(webAppUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-    })
-    .then(res => res.text())
-    .then(res => {
-        alert("🎉 Pick & Drop অর্ডার সম্পন্ন: " + res);
-        loadMerchantDashboardData(() => switchTab('list'));
-    })
-    .catch(err => alert("Error: " + err));
-}
-    // চার্জ পেমেন্ট (FETCH মোড)
-  function submitPayChargeRequest() {
-    var data = {
-        action: 'payCharge',
-        phone: currentUserPhone,
-        parcelId: document.getElementById('pay-charge-parcelid').value,
-        gateway: document.getElementById('pay-charge-gateway').value,
-        txnId: document.getElementById('pay-charge-txnid').value,
-        amount: document.getElementById('pay-charge-amount').value
-    };
-
-    fetch(webAppUrl, {
-        method: 'POST',
-        body: JSON.stringify(data)
-    })
-    .then(res => res.json())
-    .then(res => alert("পেমেন্ট আপডেট: " + res.status));
-}
-function submitWithdrawRequest() {
-    var data = {
-        action: 'withdraw',
-        phone: currentUserPhone,
-        method: document.getElementById('pay-withdraw-method').value,
-        account: document.getElementById('pay-withdraw-account').value,
-        amount: document.getElementById('pay-withdraw-amount').value,
-        timestamp: getCurrentDateTime()
-    };
-
-    fetch(webAppUrl, {
-        method: 'POST',
-        body: JSON.stringify(data)
-    })
-    .then(res => res.json())
-    .then(res => {
-        if(res.status === "success") alert("🎉 উইথড্র রিকোয়েস্ট সফল!");
-        else alert("❌ ব্যর্থ: " + res.message);
-    });
-}
-    // পার্সেল এডিট মোড (FETCH মোড)
-    function openEditModal(isPickDrop, rowIndex, currentAddress, currentCod, currentNote, currentStatus) {
-        var status = (currentStatus || "").toLowerCase().trim();
-        var newAddress = currentAddress;
-        var newAmount = currentCod;
-        var newNote = "";
-
-        if (status === "pending" || status === "processing" || status === "") {
-            newAddress = prompt("পার্সেলের নতুন গন্তব্য ঠিকানা (Address) দিন:", currentAddress);
-            if (newAddress === null) return; 
-            
-            newAmount = prompt("নতুন ক্যাশ কালেকশন এমাউন্ট (COD Amount) লিখুন:", currentCod);
-            if (newAmount === null) return;
-            
-            if (!newAddress.trim() || isNaN(parseFloat(newAmount))) { 
-                alert("⚠️ ভুল ইনপুট!"); 
-                return; 
-            }
-            newNote = prompt("পার্সেলের নোট (Note) এডিট করুন (ঐচ্ছিক):", currentNote || "");
-            if (newNote === null) return;
-        } else {
-            alert("ℹ️ এই পার্সেলটি কুরিয়ার টিম প্রসেস করে ফেলেছে। আপনি শুধুমাত্র এর 'নোট (Note)' পরিবর্তন করতে পারবেন।");
-            newNote = prompt("পার্সেলের নতুন নোট (Note) দিন:", currentNote || "");
-            if (newNote === null) return;
-        }
+    
+    globalPaymentsCache.forEach(function(pay) {
+        var tr = document.createElement('tr');
+        var statusBadgeClass = "badge-pending";
+        if(pay.status.toLowerCase() === 'paid' || pay.status.toLowerCase() === 'success') statusBadgeClass = "badge-delivered";
+        if(pay.status.toLowerCase() === 'failed' || pay.status.toLowerCase() === 'cancelled') statusBadgeClass = "badge-cancelled";
         
-        google.script.run.withSuccessHandler(function(res){
-            if (res === "success") { 
-                alert("🎉 আপডেট সফলভাবে সম্পন্ন করা হয়েছে!"); 
-                loadMerchantDashboardData(); 
-            } else { 
-                alert("❌ এডিট ব্যর্থ হয়েছে: " + res); 
-            }
-        }).editPendingParcel(isPickDrop, rowIndex, newAddress, newAmount, newNote);
-    }
-
-    // স্লিপ প্রিন্ট ফাংশন
-    function printPosInvoice(parcelId) {
-        var order = globalOrdersCache.find(o => o.parcelId === parcelId);
-        if(!order) return;
-        
-        var printWindow = window.open('', '_blank', 'width=360,height=600');
-        var invoiceHtml = `
-            <html>
-            <head>
-                <title>FastRider POS Slip - ${order.parcelId}</title>
-                <style>
-                    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 12px; text-align: center; color: #000; font-size: 13px; margin: 0; }
-                    .header-title { font-size: 20px; font-weight: bold; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
-                    .dashed-separator { border-bottom: 1px dashed #000; margin: 8px 0; }
-                    .info-table { width: 100%; border-collapse: collapse; text-align: left; margin: 8px 0; }
-                    .info-table td { padding: 3px 0; vertical-align: top; }
-                    .qr-container { display: flex; justify-content: center; margin: 12px 0; }
-                    .footer-txt { font-size: 11px; font-style: italic; margin-top: 10px; }
-                    @media print { body { padding: 0; } }
-                </style>
-            </head>
-            <body>
-                <div class="header-title">FastRider Courier</div>
-                <div style="font-size:11px;">স্মার্ট কুরিয়ার সমাধান</div>
-                <div class="dashed-separator"></div>
-                
-                <table class="info-table">
-                    <tr><td><strong>Parcel ID:</strong></td><td>${order.parcelId}</td></tr>
-                    <tr><td><strong>Merchant Mobile:</strong></td><td>${currentUserPhone}</td></tr>
-                    <tr><td colspan="2"><div class="dashed-separator"></div></td></tr>
-                    <tr><td><strong>Customer:</strong></td><td>${order.customer}</td></tr>
-                    <tr><td><strong>Phone:</strong></td><td>${order.phone}</td></tr>
-                    <tr><td><strong>Address:</strong></td><td>${order.address}</td></tr>
-                    <tr><td colspan="2"><div class="dashed-separator"></div></td></tr>
-                    <tr><td><strong>COD Collect:</strong></td><td><strong>৳ ${order.cod}</strong></td></tr>
-                    <tr><td><strong>Delivery Charge:</strong></td><td>৳ ${order.charge}</td></tr>
-                    <tr><td><strong>Invoice/Note:</strong></td><td>${order.invoice} / ${order.note || '-'}</td></tr>
-                </table>
-                
-                <div class="dashed-separator"></div>
-                <div class="qr-container" id="pos-barcode-area"></div>
-                <div style="font-size:10px; font-weight:600; color:#333;">Scan QR Code for Security Data</div>
-                
-                <div class="dashed-separator"></div>
-                <div class="footer-txt">FastRider ব্যবহার করার জন্য ধন্যবাদ!</div>
-                
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-                <script>
-                    var qrStringData = "ID: ${order.parcelId}\\nCustomer: ${order.customer}\\nMob: ${order.phone}\\nCOD: ${order.cod} Taka";
-                    new QRCode(document.getElementById("pos-barcode-area"), {
-                        text: qrStringData,
-                        width: 110,
-                        height: 110
-                    });
-                    setTimeout(function() {
-                        window.print();
-                        window.close();
-                    }, 650);
-                <\/script>
-            </body>
-            </html>
+        tr.innerHTML = `
+            <td>${pay.date}</td>
+            <td><strong>${pay.type}</strong></td>
+            <td><span style="color:#555;"><i class="fa-solid fa-credit-card"></i> ${pay.method}</span></td>
+            <td>${pay.details}</td>
+            <td><strong style="color: ${pay.type==='Pay Charge'?'#f44336':'#4caf50'};">${pay.type==='Pay Charge'?'-':'+'} ৳ ${pay.amount}</strong></td>
+            <td><code style="background:#eee; padding:2px 6px; border-radius:4px;">${pay.txnId}</code></td>
+            <td><span class="badge ${statusBadgeClass}">${pay.status}</span></td>
         `;
-        
-        printWindow.document.open();
-        printWindow.document.write(invoiceHtml);
-        printWindow.document.close();
-    }
+        pTbody.appendChild(tr);
+    });
+}
 
-    // প্রোফাইল তথ্য আপডেট
-    function handleProfileUpdate() {
-        var pickup = document.getElementById('profile-pickup').value;
-        var newpass = document.getElementById('profile-newpass').value;
-        
-        if(!pickup.trim()) { alert("পিকআপ ঠিকানা ফাঁকা রাখা যাবে না!"); return; }
-        
-        google.script.run.withSuccessHandler(function(res){
-            if(res === "success") {
-                alert("🎉 আপনার প্রোফাইলের তথ্য সফলভাবে আপডেট করা হয়েছে!");
-                document.getElementById('profile-newpass').value = "";
-                loadMerchantDashboardData();
-                switchTab('home');
-            } else { alert("❌ আপডেট ব্যর্থ হয়েছে!"); }
-        }).updateMerchantProfile(currentUserPhone, pickup, newpass);
-    }
+// লাইভ সার্চ ও ট্র্যাকিং ফিল্টার
+function handleLiveTracking() {
+    filterOrders(currentActiveFilter);
+}
 
-    // লগআউট প্রসেস
-    function logout() {
-        currentUserPhone = "";
-        if (sessionTimer) clearTimeout(sessionTimer);
-        document.getElementById('dashboard-section').classList.add('hidden-section');
-        document.getElementById('auth-section').classList.remove('hidden-section');
-        document.getElementById('login-phone').value = "";
-        document.getElementById('login-pass').value = "";
-    }
-
-    // পার্সেল ডিটেইলস পপআপ ভিউ (FETCH মোড)
-    function viewParcelDetails(parcelId) {
-        document.getElementById('parcel-modal').classList.remove('hidden-section');
-        document.getElementById('modal-loader').classList.remove('hidden-section');
-        document.getElementById('modal-details').classList.add('hidden-section');
-
-        google.script.run.withSuccessHandler(function(res) {
-            document.getElementById('modal-loader').classList.add('hidden-section');
-            if (res.status === "success") {
-                document.getElementById('modal-details').classList.remove('hidden-section');
-                document.getElementById('modal-qr').src = res.qrCodeUrl;
-                document.getElementById('modal-qr').style.display = 'inline-block';
-                
-                document.getElementById('modal-info-table').innerHTML = `
-                    <tr><th class="modal-info-th">পার্সেল আইডি</th><td class="modal-info-td"><strong>${res.parcelId}</strong></td></tr>
-                    <tr><th class="modal-info-th">তারিখ ও সময়</th><td class="modal-info-td">${res.date || 'N/A'}</td></tr>
-                    <tr><th class="modal-info-th">কাস্টমার নাম</th><td class="modal-info-td">${res.customerName}</td></tr>
-                    <tr><th class="modal-info-th">মোবাইল নম্বর</th><td class="modal-info-td">${res.customerPhone}</td></tr>
-                    <tr><th class="modal-info-th">সম্পূর্ণ ঠিকানা</th><td class="modal-info-td">${res.address}</td></tr>
-                    <tr><th class="modal-info-th">অর্ডার টাইপ</th><td class="modal-info-td"><span class="badge badge-pending">${res.orderType}</span></td></tr>
-                    <tr><th class="modal-info-th">পার্সেলের ওজন</th><td class="modal-info-td">${res.weight} Kg</td></tr>
-                    <tr><th class="modal-info-th">ক্যাশ কালেকশন</th><td class="modal-info-td" style="color:var(--success-color);"><strong>৳ ${res.cod}</strong></td></tr>
-                    <tr><th class="modal-info-th">ডেলিভারি চার্জ</th><td class="modal-info-td">৳ ${res.deliveryCharge}</td></tr>
-                    <tr><th class="modal-info-th">মার্চেন্ট নোট</th><td class="modal-info-td">${res.note || 'N/A'}</td></tr>
-                `;
-            } else {
-                document.getElementById('modal-info-table').innerHTML = `<tr><td colspan="2" style="text-align:center; color:red; padding:15px;">দুঃখিত, তথ্য পাওয়া যায়নি!</td></tr>`;
-                document.getElementById('modal-details').classList.remove('hidden-section');
-                document.getElementById('modal-qr').style.display = 'none';
-            }
-        }).getParcelById(parcelId);
-    }
-
-    // মোডাল বন্ধ করা
-    function closeParcelModal() {
-        document.getElementById('parcel-modal').classList.add('hidden-section');
-    }
+// পার্সেল তালিকা ফিল্টার ও রেন্ডার
+function filterOrders(filterType) {
+    currentActiveFilter = filterType;
     </script>
 </body>
 </html>
