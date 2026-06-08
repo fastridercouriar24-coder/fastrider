@@ -1,1 +1,1 @@
-# fastrider
+# Fastrider
